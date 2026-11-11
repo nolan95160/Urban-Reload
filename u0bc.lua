@@ -248,15 +248,37 @@ local backgroundAimEnabled = false
 -- Camera independante de la souris : appliquee APRES les CameraScripts du jeu.
 -- La boucle de visée ne fait que choisir une cible ; c'est ce contrôleur qui
 -- déplace réellement la caméra, même si le script du jeu la réinitialise.
-local CAMERA_BIND_NAME = "U0BC_BackgroundCamera_V25"
-local cameraControlee = nil
-local cameraTypeSauve = nil
-local cameraOffsetSauve = nil
+-- V26 : un seul pilote camera avec position, cible et rotation filtrees.
+-- Detacher les anciennes versions de BindToRenderStep.
+for _, nom in ipairs({
+    "U0BC_BackgroundCamera_V24",
+    "U0BC_BackgroundCamera_V25",
+    "U0BC_BackgroundCamera",
+}) do
+    pcall(function() RunService:UnbindFromRenderStep(nom) end)
+end
+
+local CAMERA_BIND_NAME = "U0BC_BackgroundCamera"
+local cameraControlee, cameraTypeSauve, cameraOffsetSauve = nil, nil, nil
+local cameraPositionFiltree, cameraRotationFiltree = nil, nil
+local cameraCibleFiltree, cameraTetePrecedente = nil, nil
 local cameraRenderBound = false
 local backgroundHead = nil
 local appliquerCameraBackground
 
--- Suivre le HumanoidRootPart, pas la tete animee du joueur.
+-- Nettoyage partage entre executions V26+.
+local registreCamera = nil
+pcall(function()
+    if type(getgenv) == "function" then
+        local env = getgenv()
+        if type(env) == "table" then registreCamera = env end
+    end
+    if not registreCamera and type(shared) == "table" then registreCamera = shared end
+end)
+if registreCamera and type(registreCamera.U0BC_ReleaseBackgroundCamera) == "function" then
+    pcall(registreCamera.U0BC_ReleaseBackgroundCamera)
+end
+
 local function racineLocale()
     local personnage = joueurLocal.Character
     return personnage and personnage:FindFirstChild("HumanoidRootPart")
@@ -264,9 +286,7 @@ end
 
 local function libererCameraBackground()
     if cameraRenderBound then
-        pcall(function()
-            RunService:UnbindFromRenderStep(CAMERA_BIND_NAME)
-        end)
+        pcall(function() RunService:UnbindFromRenderStep(CAMERA_BIND_NAME) end)
         cameraRenderBound = false
     end
     if cameraControlee and cameraControlee.Parent then
@@ -274,18 +294,20 @@ local function libererCameraBackground()
             cameraControlee.CameraType = cameraTypeSauve or Enum.CameraType.Custom
         end)
     end
-    cameraControlee = nil
-    cameraTypeSauve = nil
-    cameraOffsetSauve = nil
+    cameraControlee, cameraTypeSauve, cameraOffsetSauve = nil, nil, nil
+    cameraPositionFiltree, cameraRotationFiltree = nil, nil
+    cameraCibleFiltree, cameraTetePrecedente = nil, nil
     backgroundHead = nil
+end
+if registreCamera then
+    registreCamera.U0BC_ReleaseBackgroundCamera = libererCameraBackground
 end
 
 local function activerCameraBackground()
     if not (backgroundAimEnabled and farmActif) then return end
     local camera = workspace.CurrentCamera
     if not camera then return end
-
-    if cameraControlee ~= camera then
+    if camera ~= cameraControlee then
         if cameraControlee and cameraControlee.Parent then
             pcall(function()
                 cameraControlee.CameraType = cameraTypeSauve or Enum.CameraType.Custom
@@ -295,21 +317,18 @@ local function activerCameraBackground()
         cameraTypeSauve = camera.CameraType
         local racine = racineLocale()
         cameraOffsetSauve = racine and (camera.CFrame.Position - racine.Position) or nil
+        cameraPositionFiltree = camera.CFrame.Position
+        cameraRotationFiltree = camera.CFrame.Rotation
+        cameraCibleFiltree, cameraTetePrecedente = nil, nil
     end
-
-    camera.CameraType = Enum.CameraType.Scriptable
-
     if not cameraRenderBound then
-        -- Un seul controleur pour eviter les ecritures concurrentes.
         local ok = pcall(function()
             RunService:UnbindFromRenderStep(CAMERA_BIND_NAME)
             RunService:BindToRenderStep(
                 CAMERA_BIND_NAME,
                 Enum.RenderPriority.Last.Value,
                 function(dt)
-                    if appliquerCameraBackground then
-                        appliquerCameraBackground(dt)
-                    end
+                    if appliquerCameraBackground then appliquerCameraBackground(dt) end
                 end
             )
         end)
@@ -329,31 +348,52 @@ appliquerCameraBackground = function(dt)
         camera.CameraType = Enum.CameraType.Scriptable
     end
 
+    local pas = math.clamp(dt or (1 / 60), 1 / 240, 0.05)
     local racine = racineLocale()
     if racine and not cameraOffsetSauve then
         cameraOffsetSauve = camera.CFrame.Position - racine.Position
     end
 
-    local positionCamera = camera.CFrame.Position
+    -- Position posee sur la racine physique, avec amortissement anti-jitter.
+    local souhait = cameraPositionFiltree or camera.CFrame.Position
     if racine and cameraOffsetSauve then
-        positionCamera = racine.Position + cameraOffsetSauve
+        souhait = racine.Position + cameraOffsetSauve
     end
+    cameraPositionFiltree = (cameraPositionFiltree or souhait):Lerp(
+        souhait, 1 - math.exp(-pas * 14)
+    )
 
-    local rotationActuelle = camera.CFrame.Rotation
     local tete = backgroundHead
-    if not (tete and tete.Parent) then
-        camera.CFrame = CFrame.new(positionCamera) * rotationActuelle
-        return
+    if tete and tete.Parent and tete:IsA("BasePart") then
+        if tete ~= cameraTetePrecedente or not cameraCibleFiltree then
+            cameraTetePrecedente = tete
+            cameraCibleFiltree = tete.Position
+        else
+            cameraCibleFiltree = cameraCibleFiltree:Lerp(
+                tete.Position, 1 - math.exp(-pas * 18)
+            )
+        end
+
+        if (cameraCibleFiltree - cameraPositionFiltree).Magnitude > 0.05 then
+            local cibleRotation = CFrame.lookAt(
+                cameraPositionFiltree, cameraCibleFiltree
+            ).Rotation
+            cameraRotationFiltree = (cameraRotationFiltree or cibleRotation):Lerp(
+                cibleRotation, 1 - math.exp(-pas * 11)
+            )
+        end
+    else
+        cameraTetePrecedente, cameraCibleFiltree = nil, nil
     end
 
-    local ciblePosition = tete.Position
-    if (ciblePosition - positionCamera).Magnitude <= 0.05 then return end
-    local rotationCible = CFrame.lookAt(positionCamera, ciblePosition).Rotation
-    local delta = math.clamp(dt or 1/60, 1/240, 0.06)
-    local alpha = math.clamp(1 - math.exp(-delta * 8), 0.01, 0.40)
-    camera.CFrame = CFrame.new(positionCamera)
-        * rotationActuelle:Lerp(rotationCible, alpha)
-    camera.Focus = CFrame.new(ciblePosition)
+    -- Ne jamais se synchroniser sur la rotation du jeu : elle peut etre ecrasee.
+    if not cameraRotationFiltree then
+        cameraRotationFiltree = camera.CFrame.Rotation
+    end
+    camera.CFrame = CFrame.new(cameraPositionFiltree) * cameraRotationFiltree
+    camera.Focus = CFrame.new(
+        cameraCibleFiltree or (cameraPositionFiltree + cameraRotationFiltree.LookVector * 20)
+    )
 end
 
 local function coordonneesFarm()
@@ -567,11 +607,24 @@ end
 
 -- Ne choisit que les Hood dans le FOV ET dont la tete est visible.
 -- Aucun retour vers le Hood le plus proche s'il se trouve derriere un mur.
-local function choisirCible()
+local function choisirCible(modeleVerrouille)
     local camera = workspace.CurrentCamera
     local personnage = joueurLocal.Character
     local teteLocale = personnage and personnage:FindFirstChild("Head")
     if not camera or not teteLocale then return nil end
+
+    -- Eviter de changer de Hood chaque image quand les scores sont proches.
+    if modeleVerrouille then
+        for _, actuelle in ipairs(cache) do
+            if actuelle.model == modeleVerrouille and cibleValide(actuelle) then
+                local dist = (actuelle.head.Position - teteLocale.Position).Magnitude
+                if dist <= CFG.DistLock and dansFOV(actuelle.head.Position)
+                    and visible(actuelle.head, actuelle.model) then
+                    return actuelle
+                end
+            end
+        end
+    end
 
     local meilleure, meilleurScore = nil, math.huge
     for _, cible in ipairs(cache) do
@@ -641,9 +694,9 @@ local function viserTete(tete)
         + camera.CFrame.UpVector * visee.microY
 
     if backgroundAimEnabled and farmActif then
-        -- Rotation directement vers Head, sans micro-correction reactive.
+        -- L'orientation est uniquement appliquee dans la boucle de rendu.
         backgroundHead = tete
-        activerCameraBackground()
+        if not cameraRenderBound then activerCameraBackground() end
         return true
     end
 
@@ -922,7 +975,7 @@ local function boucleFarm(id)
 
         while farmId == id and modePauseActif == cycleAvecPauses
             and (not cycleAvecPauses or os.clock() - debutCombat < CFG.DureeCombat) do
-            local cible = choisirCible() -- Ne verrouille pas les Hood caches derriere un mur.
+            local cible = choisirCible(cibleActuelle) -- Conserver le verrou si possible.
             local maintenant = os.clock()
 
             if maintenant >= prochainStatut then
@@ -1311,7 +1364,7 @@ addGui("TextLabel", header, {
 local version = addGui("TextLabel", header, {
     Position = UDim2.new(1, -169, 0, 27), Size = UDim2.fromOffset(61, 23),
     BackgroundColor3 = T.surface2, BackgroundTransparency = 0.04,
-    Font = Enum.Font.Code, TextSize = 10, Text = "V24.0",
+    Font = Enum.Font.Code, TextSize = 10, Text = "V26.0",
     TextColor3 = T.cyan,
 })
 corner(version, 8)
