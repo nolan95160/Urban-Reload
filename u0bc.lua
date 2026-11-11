@@ -1176,8 +1176,193 @@ local function configurerAntiDance(active)
     end)
 end
 
--- ================= U0BC | INTERFACE V17 =================
--- Menus : AIM, VISUAL, SETTING. Art original inspire de la structure verre/neon
+-- ================= WORLD : MODES GRAPHIQUES REVERSIBLES V27 =================
+-- FULL FPS : sans ombres globales, post-effets et particules.
+-- POTATO   : simplifie les materiaux/textures en plus des effets.
+-- NORMAL   : restaure les valeurs sauvegardees (sans detruire d'objets).
+-- Ne modifie jamais collision, raycasts, scripts ou simulation Roblox.
+local Lighting = game:GetService("Lighting")
+local worldMode = "NORMAL"
+local worldGeneration = 0
+local worldSnapshots = setmetatable({}, {__mode = "k"})
+local worldConnections = {}
+local worldFPSAvant = nil
+local worldFPSModifie = false
+
+local function worldChanger(objet, propriete, nouvelleValeur)
+    if not objet then return end
+    local okLecture, valeurAvant = pcall(function() return objet[propriete] end)
+    if not okLecture or valeurAvant == nouvelleValeur then return end
+    local okEcriture = pcall(function() objet[propriete] = nouvelleValeur end)
+    if not okEcriture then return end
+    local sauvegarde = worldSnapshots[objet]
+    if not sauvegarde then
+        sauvegarde = {}
+        worldSnapshots[objet] = sauvegarde
+    end
+    if sauvegarde[propriete] == nil then
+        sauvegarde[propriete] = valeurAvant
+    end
+end
+
+local function worldAppliquerObjet(objet, mode)
+    if not objet or not objet.Parent or mode == "NORMAL" then return end
+    local potato = mode == "POTATO"
+
+    if objet == Lighting then
+        worldChanger(objet, "GlobalShadows", false)
+        worldChanger(objet, "ShadowSoftness", 0)
+        if potato then
+            worldChanger(objet, "EnvironmentDiffuseScale", 0)
+            worldChanger(objet, "EnvironmentSpecularScale", 0)
+        end
+    elseif objet:IsA("BasePart") then
+        worldChanger(objet, "CastShadow", false)
+        if potato then
+            -- Materiaux des decors fixes uniquement : aucune physique modifiee.
+            if objet.Anchored then
+                worldChanger(objet, "Material", Enum.Material.SmoothPlastic)
+                worldChanger(objet, "MaterialVariant", "")
+            end
+            worldChanger(objet, "Reflectance", 0)
+            if objet:IsA("MeshPart") then
+                worldChanger(objet, "TextureID", "")
+                worldChanger(objet, "RenderFidelity", Enum.RenderFidelity.Performance)
+            end
+        end
+    elseif objet:IsA("PostEffect")
+        or objet:IsA("ParticleEmitter") or objet:IsA("Trail")
+        or objet:IsA("Beam") or objet:IsA("Fire")
+        or objet:IsA("Smoke") or objet:IsA("Sparkles") then
+        worldChanger(objet, "Enabled", false)
+    elseif potato then
+        if objet:IsA("Decal") or objet:IsA("Texture") then
+            worldChanger(objet, "Transparency", 1)
+        elseif objet:IsA("SpecialMesh") then
+            worldChanger(objet, "TextureId", "")
+        elseif objet:IsA("SurfaceAppearance") then
+            for _, propriete in ipairs({"ColorMap", "NormalMap", "MetalnessMap", "RoughnessMap"}) do
+                worldChanger(objet, propriete, "")
+            end
+        elseif objet:IsA("Atmosphere") then
+            worldChanger(objet, "Density", 0)
+            worldChanger(objet, "Haze", 0)
+            worldChanger(objet, "Glare", 0)
+        elseif objet:IsA("Clouds") then
+            worldChanger(objet, "Cover", 0)
+        elseif objet:IsA("Sky") then
+            worldChanger(objet, "CelestialBodiesShown", false)
+            worldChanger(objet, "StarCount", 0)
+        elseif objet:IsA("Terrain") then
+            worldChanger(objet, "Decoration", false)
+            worldChanger(objet, "WaterWaveSize", 0)
+            worldChanger(objet, "WaterWaveSpeed", 0)
+            worldChanger(objet, "WaterReflectance", 0)
+        elseif objet:IsA("PointLight") or objet:IsA("SpotLight")
+            or objet:IsA("SurfaceLight") then
+            worldChanger(objet, "Enabled", false)
+        end
+    end
+end
+
+local function restaurerWorld()
+    worldGeneration += 1
+    worldMode = "NORMAL"
+
+    for _, connexion in ipairs(worldConnections) do
+        pcall(function() connexion:Disconnect() end)
+    end
+    worldConnections = {}
+
+    local copies = worldSnapshots
+    worldSnapshots = setmetatable({}, {__mode = "k"})
+    for objet, proprietes in pairs(copies) do
+        if objet and objet.Parent then
+            for propriete, valeur in pairs(proprietes) do
+                pcall(function() objet[propriete] = valeur end)
+            end
+        end
+    end
+
+    if worldFPSModifie and type(setfpscap) == "function"
+        and type(worldFPSAvant) == "number" then
+        pcall(setfpscap, worldFPSAvant)
+    end
+    worldFPSAvant = nil
+    worldFPSModifie = false
+end
+
+-- Si une V27+ tourne deja, restaurer son World avant d'enregistrer la nouvelle.
+local registreWorld = nil
+pcall(function()
+    if type(getgenv) == "function" then
+        local environnement = getgenv()
+        if type(environnement) == "table" then registreWorld = environnement end
+    end
+    if not registreWorld and type(shared) == "table" then registreWorld = shared end
+end)
+if registreWorld and type(registreWorld.U0BC_RestoreWorld) == "function" then
+    pcall(registreWorld.U0BC_RestoreWorld)
+end
+if registreWorld then registreWorld.U0BC_RestoreWorld = restaurerWorld end
+
+local function definirWorldMode(mode)
+    if mode ~= "NORMAL" and mode ~= "FULL FPS" and mode ~= "POTATO" then return end
+    if worldMode == mode then return end
+
+    restaurerWorld()
+    if mode == "NORMAL" then return end
+
+    worldMode = mode
+    worldGeneration += 1
+    local generation = worldGeneration
+    worldAppliquerObjet(Lighting, mode)
+
+    -- Limiter les FPS en POTATO seulement si l'ancienne limite est lisible,
+    -- afin de pouvoir la restaurer exactement en mode NORMAL.
+    if mode == "POTATO" and type(getfpscap) == "function"
+        and type(setfpscap) == "function" then
+        local ok, limite = pcall(getfpscap)
+        if ok and type(limite) == "number"
+            and (limite > 20 or limite <= 0) then
+            local applique = pcall(setfpscap, 20)
+            if applique then
+                worldFPSAvant = limite
+                worldFPSModifie = true
+            end
+        end
+    end
+
+    local function surveillerAjouts(parent)
+        table.insert(worldConnections, parent.DescendantAdded:Connect(function(objet)
+            task.defer(function()
+                if worldGeneration == generation and worldMode == mode then
+                    worldAppliquerObjet(objet, mode)
+                end
+            end)
+        end))
+    end
+    surveillerAjouts(workspace)
+    surveillerAjouts(Lighting)
+
+    -- Parcours progressif : ne pas bloquer le menu sur les grandes maps.
+    task.spawn(function()
+        local function balayer(parent)
+            local objets = parent:GetDescendants()
+            for index, objet in ipairs(objets) do
+                if worldGeneration ~= generation or worldMode ~= mode then return false end
+                worldAppliquerObjet(objet, mode)
+                if index % 300 == 0 then task.wait() end
+            end
+            return true
+        end
+        if not balayer(Lighting) then return end
+        balayer(workspace)
+    end)
+end
+
+-- ================= U0BC | INTERFACE V27 =================
+-- Menus : AIM, VISUAL, WORLD, SETTING. Art original inspire de la structure verre/neon
 -- de Local S, avec une palette ardoise/violet/cyan et un fond anime.
 local T = {
     bg = Color3.fromRGB(7, 7, 9),
@@ -1364,7 +1549,7 @@ addGui("TextLabel", header, {
 local version = addGui("TextLabel", header, {
     Position = UDim2.new(1, -169, 0, 27), Size = UDim2.fromOffset(61, 23),
     BackgroundColor3 = T.surface2, BackgroundTransparency = 0.04,
-    Font = Enum.Font.Code, TextSize = 10, Text = "V26.0",
+    Font = Enum.Font.Code, TextSize = 10, Text = "V27.0",
     TextColor3 = T.cyan,
 })
 corner(version, 8)
@@ -1440,6 +1625,7 @@ local currentPage = nil
 local tabLabels = {
     AIM = {title = "AIM", subtitle = ""},
     VISUAL = {title = "VISUAL", subtitle = ""},
+    WORLD = {title = "WORLD", subtitle = "OPTIMISATION DU RENDU"},
     SETTING = {title = "PREFERENCES", subtitle = ""},
 }
 
@@ -1525,7 +1711,8 @@ end
 
 local pageAim = newTab("AIM", "", 0)
 local pageVisual = newTab("VISUAL", "", 1)
-local pageSetting = newTab("SETTING", "", 2)
+local pageWorld = newTab("WORLD", "", 2)
+local pageSetting = newTab("SETTING", "", 3)
 
 local function newRow(page, y, height)
     local r = addGui("Frame", page, {
@@ -1589,6 +1776,70 @@ local function newToggle(page, y, title, subtitle, onChange, keyLabel)
     row.MouseLeave:Connect(function() tween(row, 0.18, {BackgroundColor3 = T.row}) end)
     return {set = setOn, get = function() return isOn end, bind = bind, row = row}
 end
+
+-- ================= WORLD : 3 PROFILS EXCLUSIFS =================
+local worldButtons = {}
+local worldEtatTexte = nil
+
+local function actualiserWorldBoutons()
+    for nomMode, bouton in pairs(worldButtons) do
+        local actif = worldMode == nomMode
+        tween(bouton, 0.18, {
+            BackgroundColor3 = actif and T.cyan or T.surface2,
+            TextColor3 = actif and T.text or T.muted,
+        })
+    end
+    if worldEtatTexte then
+        local infoFPS = worldFPSModifie and " | 20 FPS" or ""
+        worldEtatTexte.Text = "MODE ACTIF : " .. worldMode .. infoFPS
+    end
+end
+
+local function creerBoutonWorld(y, nom, titre, description)
+    local ligne = newRow(pageWorld, y, 75)
+    addGui("TextLabel", ligne, {
+        Position = UDim2.fromOffset(15, 10),
+        Size = UDim2.new(1, -135, 0, 25),
+        BackgroundTransparency = 1, Text = titre,
+        Font = Enum.Font.GothamBlack, TextSize = 13,
+        TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left,
+    })
+    addGui("TextLabel", ligne, {
+        Position = UDim2.fromOffset(15, 39),
+        Size = UDim2.new(1, -126, 0, 18),
+        BackgroundTransparency = 1, Text = description,
+        Font = Enum.Font.Code, TextSize = 10,
+        TextColor3 = T.muted, TextXAlignment = Enum.TextXAlignment.Left,
+    })
+    local bouton = addGui("TextButton", ligne, {
+        Position = UDim2.new(1, -116, 0.5, -16),
+        Size = UDim2.fromOffset(100, 32),
+        BackgroundColor3 = T.surface2, BorderSizePixel = 0,
+        Text = nom == "NORMAL" and "RESTORE" or "ACTIVER",
+        TextColor3 = T.muted, TextSize = 11,
+        Font = Enum.Font.Code, AutoButtonColor = false,
+    })
+    corner(bouton, 9)
+    stroke(bouton, T.border, 1, 0.45)
+    worldButtons[nom] = bouton
+    bouton.MouseButton1Click:Connect(function()
+        definirWorldMode(nom)
+        actualiserWorldBoutons()
+    end)
+    return ligne
+end
+
+creerBoutonWorld(50, "FULL FPS", "FULL FPS", "Sans ombres / effets, visuel propre")
+creerBoutonWorld(133, "POTATO", "POTATO", "Textures OFF, details minimum")
+creerBoutonWorld(216, "NORMAL", "NORMAL", "Remet les reglages initiaux")
+worldEtatTexte = addGui("TextLabel", pageWorld, {
+    Position = UDim2.fromOffset(9, 296),
+    Size = UDim2.new(1, -18, 0, 16),
+    BackgroundTransparency = 1, Text = "MODE ACTIF : NORMAL",
+    Font = Enum.Font.Code, TextSize = 10,
+    TextColor3 = T.cyan, TextXAlignment = Enum.TextXAlignment.Center,
+})
+actualiserWorldBoutons()
 
 -- Applique la couleur aux ESP deja presents SANS les desactiver/recreer.
 local function appliquerCouleurZombie(couleur)
@@ -2270,6 +2521,7 @@ local closed = false
 local function closeAll()
     if closed then return end
     closed = true
+    restaurerWorld()
     farmToggle.set(false)
     backgroundToggle.set(false)
     undetectToggle.set(false)
@@ -2295,6 +2547,8 @@ local function closeAll()
 end
 closeBtn.MouseButton1Click:Connect(closeAll)
 closeMain.MouseButton1Click:Connect(closeAll)
+-- Restaurer meme si le menu est detruit par une nouvelle execution.
+gui.Destroying:Connect(restaurerWorld)
 
 -- Les callbacks du menu ne sont pas sauvegardes dans l'ancien script V9.
 -- Desactivez l'ancienne execution avant d'executer cette version.
