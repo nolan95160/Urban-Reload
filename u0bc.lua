@@ -248,25 +248,26 @@ local backgroundAimEnabled = false
 -- Camera independante de la souris : appliquee APRES les CameraScripts du jeu.
 -- La boucle de visée ne fait que choisir une cible ; c'est ce contrôleur qui
 -- déplace réellement la caméra, même si le script du jeu la réinitialise.
-local CAMERA_BIND_NAME = "U0BC_BackgroundCamera_V24"
+local CAMERA_BIND_NAME = "U0BC_BackgroundCamera_V25"
 local cameraControlee = nil
 local cameraTypeSauve = nil
 local cameraOffsetSauve = nil
 local cameraRenderBound = false
-local cameraHeartbeatConnection = nil
-local cameraDernierRendu = 0
 local backgroundHead = nil
-local backgroundPosition = nil
 local appliquerCameraBackground
+
+-- Suivre le HumanoidRootPart, pas la tete animee du joueur.
+local function racineLocale()
+    local personnage = joueurLocal.Character
+    return personnage and personnage:FindFirstChild("HumanoidRootPart")
+end
 
 local function libererCameraBackground()
     if cameraRenderBound then
-        pcall(function() RunService:UnbindFromRenderStep(CAMERA_BIND_NAME) end)
+        pcall(function()
+            RunService:UnbindFromRenderStep(CAMERA_BIND_NAME)
+        end)
         cameraRenderBound = false
-    end
-    if cameraHeartbeatConnection then
-        cameraHeartbeatConnection:Disconnect()
-        cameraHeartbeatConnection = nil
     end
     if cameraControlee and cameraControlee.Parent then
         pcall(function()
@@ -277,17 +278,14 @@ local function libererCameraBackground()
     cameraTypeSauve = nil
     cameraOffsetSauve = nil
     backgroundHead = nil
-    backgroundPosition = nil
-    cameraDernierRendu = 0
 end
 
 local function activerCameraBackground()
-    if not backgroundAimEnabled or not farmActif then return end
+    if not (backgroundAimEnabled and farmActif) then return end
     local camera = workspace.CurrentCamera
     if not camera then return end
 
     if cameraControlee ~= camera then
-        -- Roblox peut remplacer CurrentCamera en cours de partie / respawn.
         if cameraControlee and cameraControlee.Parent then
             pcall(function()
                 cameraControlee.CameraType = cameraTypeSauve or Enum.CameraType.Custom
@@ -295,38 +293,27 @@ local function activerCameraBackground()
         end
         cameraControlee = camera
         cameraTypeSauve = camera.CameraType
-        local perso = joueurLocal.Character
-        local teteLocale = perso and perso:FindFirstChild("Head")
-        cameraOffsetSauve = teteLocale and (camera.CFrame.Position - teteLocale.Position) or nil
+        local racine = racineLocale()
+        cameraOffsetSauve = racine and (camera.CFrame.Position - racine.Position) or nil
     end
 
-    if camera.CameraType ~= Enum.CameraType.Scriptable then
-        camera.CameraType = Enum.CameraType.Scriptable
-    end
+    camera.CameraType = Enum.CameraType.Scriptable
 
     if not cameraRenderBound then
-        pcall(function() RunService:UnbindFromRenderStep(CAMERA_BIND_NAME) end)
-        -- Last : appliquer notre rotation après la plupart des mises à jour caméra.
-        RunService:BindToRenderStep(
-            CAMERA_BIND_NAME,
-            Enum.RenderPriority.Last.Value,
-            function(dt)
-                cameraDernierRendu = os.clock()
-                if appliquerCameraBackground then
-                    appliquerCameraBackground(dt)
+        -- Un seul controleur pour eviter les ecritures concurrentes.
+        local ok = pcall(function()
+            RunService:UnbindFromRenderStep(CAMERA_BIND_NAME)
+            RunService:BindToRenderStep(
+                CAMERA_BIND_NAME,
+                Enum.RenderPriority.Last.Value,
+                function(dt)
+                    if appliquerCameraBackground then
+                        appliquerCameraBackground(dt)
+                    end
                 end
-            end
-        )
-        cameraRenderBound = true
-    end
-    if not cameraHeartbeatConnection then
-        -- Quand Roblox est en arrière-plan, les frames de rendu peuvent ralentir.
-        -- Heartbeat continue seulement si le client exécute encore ses scripts.
-        cameraHeartbeatConnection = RunService.Heartbeat:Connect(function(dt)
-            if os.clock() - cameraDernierRendu > 0.14 then
-                if appliquerCameraBackground then appliquerCameraBackground(dt) end
-            end
+            )
         end)
+        cameraRenderBound = ok
     end
 end
 
@@ -336,37 +323,36 @@ appliquerCameraBackground = function(dt)
     if not camera then return end
     if camera ~= cameraControlee then
         activerCameraBackground()
+        if camera ~= cameraControlee then return end
     end
     if camera.CameraType ~= Enum.CameraType.Scriptable then
         camera.CameraType = Enum.CameraType.Scriptable
     end
 
-    local perso = joueurLocal.Character
-    local teteLocale = perso and perso:FindFirstChild("Head")
-    if teteLocale and not cameraOffsetSauve then
-        cameraOffsetSauve = camera.CFrame.Position - teteLocale.Position
-    end
-    local positionCamera = camera.CFrame.Position
-    if teteLocale and cameraOffsetSauve then
-        positionCamera = teteLocale.Position + cameraOffsetSauve
+    local racine = racineLocale()
+    if racine and not cameraOffsetSauve then
+        cameraOffsetSauve = camera.CFrame.Position - racine.Position
     end
 
+    local positionCamera = camera.CFrame.Position
+    if racine and cameraOffsetSauve then
+        positionCamera = racine.Position + cameraOffsetSauve
+    end
+
+    local rotationActuelle = camera.CFrame.Rotation
     local tete = backgroundHead
-    local pos = backgroundPosition
-    if not (tete and tete.Parent and pos) then
-        -- Laisse le dernier angle mais continue à suivre le personnage.
-        if (positionCamera - camera.CFrame.Position).Magnitude > 0.01 then
-            camera.CFrame = CFrame.new(positionCamera) * camera.CFrame.Rotation
-        end
+    if not (tete and tete.Parent) then
+        camera.CFrame = CFrame.new(positionCamera) * rotationActuelle
         return
     end
 
-    -- La cible suit la tête, même si le Hood se déplace entre deux scans.
-    local ciblePosition = tete.Position + pos
-    if (ciblePosition - positionCamera).Magnitude <= 0.02 then return end
-    local cibleCFrame = CFrame.lookAt(positionCamera, ciblePosition)
-    local alpha = 1 - math.exp(-math.clamp(dt or 0.016, 0.004, 0.10) * 13)
-    camera.CFrame = camera.CFrame:Lerp(cibleCFrame, math.clamp(alpha, 0.03, 0.72))
+    local ciblePosition = tete.Position
+    if (ciblePosition - positionCamera).Magnitude <= 0.05 then return end
+    local rotationCible = CFrame.lookAt(positionCamera, ciblePosition).Rotation
+    local delta = math.clamp(dt or 1/60, 1/240, 0.06)
+    local alpha = math.clamp(1 - math.exp(-delta * 8), 0.01, 0.40)
+    camera.CFrame = CFrame.new(positionCamera)
+        * rotationActuelle:Lerp(rotationCible, alpha)
     camera.Focus = CFrame.new(ciblePosition)
 end
 
@@ -615,7 +601,6 @@ local function preparerVisee(tete)
     local maintenant = os.clock()
     if not tete then
         backgroundHead = nil
-        backgroundPosition = nil
     end
     visee.tete = tete
     visee.debut = maintenant
@@ -656,10 +641,8 @@ local function viserTete(tete)
         + camera.CFrame.UpVector * visee.microY
 
     if backgroundAimEnabled and farmActif then
-        -- La camera est mise à jour dans BindToRenderStep, après la camera du jeu.
-        -- La souris Windows reste libre sur un autre écran.
+        -- Rotation directement vers Head, sans micro-correction reactive.
         backgroundHead = tete
-        backgroundPosition = positionVisee - tete.Position
         activerCameraBackground()
         return true
     end
