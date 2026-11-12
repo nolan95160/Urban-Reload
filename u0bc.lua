@@ -107,80 +107,173 @@ local function rounded(instance, radius)
     corner.Parent = instance
 end
 
+
+-- V43 : panneau de licence assorti a la DA noir et bordeaux.
 local frame = Instance.new("Frame")
 frame.Name = "AuthPanel"
 frame.AnchorPoint = Vector2.new(0.5, 0.5)
 frame.Position = UDim2.fromScale(0.5, 0.5)
-frame.Size = UDim2.fromOffset(390, 275)
-frame.BackgroundColor3 = Color3.fromRGB(19, 20, 27)
+frame.Size = UDim2.fromOffset(430, 325)
+frame.BackgroundColor3 = Color3.fromRGB(11, 5, 8)
 frame.BorderSizePixel = 0
+frame.ClipsDescendants = true
 frame.Parent = gui
-rounded(frame, 12)
+rounded(frame, 19)
 
 local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(156, 37, 52)
-stroke.Thickness = 1
+stroke.Color = Color3.fromRGB(211, 38, 64)
+stroke.Thickness = 1.5
+stroke.Transparency = 0.12
 stroke.Parent = frame
+
+do
+    local TweenService = game:GetService("TweenService")
+    local gradient = Instance.new("UIGradient")
+    gradient.Rotation = 30
+    gradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(9, 5, 8)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(30, 9, 18)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(12, 5, 10)),
+    })
+    gradient.Parent = frame
+    TweenService:Create(gradient, TweenInfo.new(18, Enum.EasingStyle.Linear,
+        Enum.EasingDirection.InOut, -1), {Rotation = 390}):Play()
+    local mark = Instance.new("Frame")
+    mark.Position = UDim2.fromOffset(20, 21)
+    mark.Size = UDim2.fromOffset(45, 45)
+    mark.BackgroundColor3 = Color3.fromRGB(31, 12, 19)
+    mark.BorderSizePixel = 0
+    mark.Parent = frame
+    rounded(mark, 12)
+    local markBorder = Instance.new("UIStroke")
+    markBorder.Color = Color3.fromRGB(211, 38, 64)
+    markBorder.Thickness = 1.2
+    markBorder.Parent = mark
+    local letter = Instance.new("TextLabel")
+    letter.Size = UDim2.fromScale(1, 1)
+    letter.BackgroundTransparency = 1
+    letter.Font = Enum.Font.GothamBold
+    letter.TextSize = 25
+    letter.Text = "U"
+    letter.TextColor3 = Color3.fromRGB(255, 69, 93)
+    letter.Parent = mark
+    local divider = Instance.new("Frame")
+    divider.Position = UDim2.fromOffset(22, 84)
+    divider.Size = UDim2.new(1, -44, 0, 1)
+    divider.BackgroundColor3 = Color3.fromRGB(112, 23, 42)
+    divider.BorderSizePixel = 0
+    divider.Parent = frame
+    local version = Instance.new("TextLabel")
+    version.Position = UDim2.new(1, -74, 0, 30)
+    version.Size = UDim2.fromOffset(52, 24)
+    version.BackgroundColor3 = Color3.fromRGB(39, 14, 22)
+    version.Font = Enum.Font.GothamBold
+    version.TextSize = 11
+    version.Text = "V43"
+    version.TextColor3 = Color3.fromRGB(255, 87, 106)
+    version.Parent = frame
+    rounded(version, 7)
+    local scale = Instance.new("UIScale")
+    scale.Scale = 0.94
+    scale.Parent = frame
+    TweenService:Create(scale, TweenInfo.new(0.34,
+        Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1}):Play()
+end
 
 local title = Instance.new("TextLabel")
 title.BackgroundTransparency = 1
-title.Position = UDim2.fromOffset(22, 17)
-title.Size = UDim2.new(1, -44, 0, 35)
+title.Position = UDim2.fromOffset(78, 19)
+title.Size = UDim2.fromOffset(265, 30)
 title.Font = Enum.Font.GothamBold
-title.TextSize = 20
-title.TextColor3 = Color3.fromRGB(255, 255, 255)
+title.TextSize = 21
+title.TextColor3 = Color3.fromRGB(250, 242, 244)
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Text = "URBAN RELOAD"
 title.Parent = frame
 
 local subtitle = Instance.new("TextLabel")
 subtitle.BackgroundTransparency = 1
-subtitle.Position = UDim2.fromOffset(22, 52)
-subtitle.Size = UDim2.new(1, -44, 0, 25)
+subtitle.Position = UDim2.fromOffset(79, 47)
+subtitle.Size = UDim2.fromOffset(268, 20)
 subtitle.Font = Enum.Font.Gotham
 subtitle.TextSize = 12
-subtitle.TextColor3 = Color3.fromRGB(175, 176, 187)
+subtitle.TextColor3 = Color3.fromRGB(195, 170, 179)
 subtitle.TextXAlignment = Enum.TextXAlignment.Left
-subtitle.Text = "Entre ta cle personnelle pour lancer la V42"
+subtitle.Text = "CONTROL CENTER / ACCES PRIVE"
 subtitle.Parent = frame
+
+do
+    local hint = Instance.new("TextLabel")
+    hint.Position = UDim2.fromOffset(23, 102)
+    hint.Size = UDim2.new(1, -46, 0, 21)
+    hint.BackgroundTransparency = 1
+    hint.Font = Enum.Font.GothamBold
+    hint.TextSize = 13
+    hint.TextColor3 = Color3.fromRGB(240, 225, 230)
+    hint.TextXAlignment = Enum.TextXAlignment.Left
+    hint.Text = "CLE DE LICENCE"
+    hint.Parent = frame
+end
 
 local keyBox = Instance.new("TextBox")
 keyBox.Name = "LicenseInput"
-keyBox.Position = UDim2.fromOffset(22, 89)
-keyBox.Size = UDim2.new(1, -44, 0, 40)
-keyBox.BackgroundColor3 = Color3.fromRGB(34, 35, 45)
+keyBox.Position = UDim2.fromOffset(23, 129)
+keyBox.Size = UDim2.new(1, -46, 0, 45)
+keyBox.BackgroundColor3 = Color3.fromRGB(31, 12, 19)
 keyBox.BorderSizePixel = 0
-keyBox.Font = Enum.Font.Code
-keyBox.TextSize = 13
-keyBox.TextColor3 = Color3.fromRGB(245, 245, 245)
-keyBox.PlaceholderColor3 = Color3.fromRGB(126, 128, 141)
-keyBox.PlaceholderText = "Entre ta cle courte (UR-...)"
+keyBox.Font = Enum.Font.Gotham
+keyBox.TextSize = 14
+keyBox.TextColor3 = Color3.fromRGB(250, 242, 244)
+keyBox.PlaceholderColor3 = Color3.fromRGB(158, 133, 144)
+keyBox.PlaceholderText = "UR-...  /  Entre ta cle personnelle"
 keyBox.Text = ""
 keyBox.ClearTextOnFocus = false
 keyBox.Parent = frame
-rounded(keyBox, 7)
+rounded(keyBox, 10)
+do
+    local border = Instance.new("UIStroke")
+    border.Color = Color3.fromRGB(112, 23, 42)
+    border.Transparency = 0.3
+    border.Parent = keyBox
+end
 
 local button = Instance.new("TextButton")
-button.Position = UDim2.fromOffset(22, 143)
-button.Size = UDim2.new(1, -44, 0, 39)
-button.BackgroundColor3 = Color3.fromRGB(176, 41, 60)
+button.Position = UDim2.fromOffset(23, 192)
+button.Size = UDim2.new(1, -46, 0, 44)
+button.BackgroundColor3 = Color3.fromRGB(193, 35, 56)
 button.BorderSizePixel = 0
 button.Font = Enum.Font.GothamBold
 button.TextSize = 14
 button.TextColor3 = Color3.fromRGB(255, 255, 255)
-button.Text = "ACTIVER"
+button.Text = "ACTIVER MA LICENCE"
+button.AutoButtonColor = false
 button.Parent = frame
-rounded(button, 7)
+rounded(button, 10)
+do
+    local ts = game:GetService("TweenService")
+    button.MouseEnter:Connect(function()
+        ts:Create(button, TweenInfo.new(0.16), {
+            BackgroundColor3 = Color3.fromRGB(224, 50, 73)
+        }):Play()
+    end)
+    button.MouseLeave:Connect(function()
+        ts:Create(button, TweenInfo.new(0.18), {
+            BackgroundColor3 = Color3.fromRGB(193, 35, 56)
+        }):Play()
+    end)
+end
 
 local status = Instance.new("TextLabel")
-status.Position = UDim2.fromOffset(22, 185)
-status.Size = UDim2.new(1, -44, 0, 70)
+status.Position = UDim2.fromOffset(23, 248)
+status.Size = UDim2.new(1, -46, 0, 62)
 status.BackgroundTransparency = 1
 status.Font = Enum.Font.Gotham
-status.TextSize = 12
-status.TextColor3 = Color3.fromRGB(180, 183, 194)
+status.TextSize = 13
+status.TextColor3 = Color3.fromRGB(195, 170, 179)
 status.TextWrapped = true
-status.Text = "Une cle = un appareil. La cle reste illimitee."
+status.TextXAlignment = Enum.TextXAlignment.Center
+status.TextYAlignment = Enum.TextYAlignment.Center
+status.Text = "1 cle, 1 appareil  |  Acces sans expiration"
 status.Parent = frame
 
 local busy = false
@@ -234,14 +327,14 @@ local function activate()
         end)
         if decodedOK and type(data) == "table"
             and response.StatusCode == 200 and data.ok == true and data.allowed == true then
-            setStatus("Cle valide ! Lancement de la V42...", true)
+            setStatus("Cle valide ! Lancement de la V43...", true)
             local loaded, err = pcall(launchOriginalV33)
             if loaded then
                 gui:Destroy()
                 return
             end
-            warn("[URBAN RELOAD] Erreur de lancement V42:", tostring(err))
-            setStatus("Erreur V42 : " .. tostring(err):sub(1, 160), false)
+            warn("[URBAN RELOAD] Erreur de lancement V43:", tostring(err))
+            setStatus("Erreur V43 : " .. tostring(err):sub(1, 160), false)
         elseif response.StatusCode == 401 then
             setStatus("Cle invalide ou desactivee.", false)
         elseif response.StatusCode == 403 then
@@ -254,7 +347,7 @@ local function activate()
     end
 
     busy = false
-    button.Text = "ACTIVER"
+    button.Text = "ACTIVER MA LICENCE"
     button.AutoButtonColor = true
 end
 
