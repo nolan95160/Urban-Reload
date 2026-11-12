@@ -1549,7 +1549,7 @@ addGui("TextLabel", header, {
 local version = addGui("TextLabel", header, {
     Position = UDim2.new(1, -169, 0, 27), Size = UDim2.fromOffset(61, 23),
     BackgroundColor3 = T.surface2, BackgroundTransparency = 0.04,
-    Font = Enum.Font.Code, TextSize = 10, Text = "V28.0",
+    Font = Enum.Font.Code, TextSize = 10, Text = "V29.0",
     TextColor3 = T.cyan,
 })
 corner(version, 8)
@@ -2201,6 +2201,7 @@ end
 -- flou gaussien localise par-dessus le rendu 3D en BillboardGui.
 local streamPoofActif = false
 local streamPoofMasque = nil
+local streamPoofMasqueEcran = nil
 local streamPoofConnexions = {}
 
 local function supprimerMasqueStreamPoof()
@@ -2208,6 +2209,68 @@ local function supprimerMasqueStreamPoof()
         pcall(function() streamPoofMasque:Destroy() end)
         streamPoofMasque = nil
     end
+end
+
+
+-- Masque independant de la camera, fixe en haut a gauche.
+-- Roblox ne connait pas la taille physique de l'ecran en centimetres :
+-- on reserve ~60% de sa hauteur (minimum 580 px) pour couvrir largement
+-- la zone demandee, avec une largeur bornee entre 350 et 560 pixels.
+local function supprimerMasqueEcranStreamPoof()
+    if streamPoofMasqueEcran then
+        pcall(function() streamPoofMasqueEcran:Destroy() end)
+        streamPoofMasqueEcran = nil
+    end
+end
+
+local function creerMasqueEcranStreamPoof()
+    if not streamPoofActif then return end
+    supprimerMasqueEcranStreamPoof()
+
+    local playerGui = joueurLocal:WaitForChild("PlayerGui")
+    local ancien = playerGui:FindFirstChild("U0BC_StreamPoof_KillFeed")
+    if ancien then ancien:Destroy() end
+
+    local masqueEcran = Instance.new("ScreenGui")
+    masqueEcran.Name = "U0BC_StreamPoof_KillFeed"
+    masqueEcran.ResetOnSpawn = false
+    masqueEcran.IgnoreGuiInset = true
+    masqueEcran.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+    masqueEcran.DisplayOrder = 100000
+    masqueEcran.Parent = playerGui
+
+    local voile = Instance.new("Frame")
+    voile.Name = "MasqueKillFeedHautGauche"
+    voile.AnchorPoint = Vector2.new(0, 0)
+    voile.Position = UDim2.fromScale(0, 0)
+    voile.Size = UDim2.new(0.22, 0, 0.60, 0)
+    voile.BackgroundColor3 = Color3.fromRGB(24, 26, 32)
+    voile.BackgroundTransparency = 0.02
+    voile.BorderSizePixel = 0
+    voile.ZIndex = 10
+    voile.Parent = masqueEcran
+
+    local limites = Instance.new("UISizeConstraint")
+    limites.MinSize = Vector2.new(350, 580)
+    limites.MaxSize = Vector2.new(560, 1600)
+    limites.Parent = voile
+
+    local arrondi = Instance.new("UICorner")
+    arrondi.CornerRadius = UDim.new(0, 16)
+    arrondi.Parent = voile
+
+    -- Degrade purement visuel ; coeur opaque pour rendre la kill feed illisible.
+    local degrade = Instance.new("UIGradient")
+    degrade.Rotation = 0
+    degrade.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(53, 57, 67)),
+        ColorSequenceKeypoint.new(0.12, Color3.fromRGB(26, 29, 36)),
+        ColorSequenceKeypoint.new(0.88, Color3.fromRGB(26, 29, 36)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(53, 57, 67)),
+    })
+    degrade.Parent = voile
+
+    streamPoofMasqueEcran = masqueEcran
 end
 
 local function creerMasqueStreamPoof(personnage)
@@ -2268,11 +2331,13 @@ local function desactiverStreamPoof()
     end
     streamPoofConnexions = {}
     supprimerMasqueStreamPoof()
+    supprimerMasqueEcranStreamPoof()
 end
 
 local function activerStreamPoof()
     if streamPoofActif then return end
     streamPoofActif = true
+    creerMasqueEcranStreamPoof()
     local ancienMasque = joueurLocal:WaitForChild("PlayerGui"):FindFirstChild("U0BC_StreamPoof_Mask")
     if ancienMasque then ancienMasque:Destroy() end
     table.insert(streamPoofConnexions, joueurLocal.CharacterAdded:Connect(function(personnage)
@@ -2285,7 +2350,7 @@ local function activerStreamPoof()
 end
 
 local streamPoofToggle = newToggle(pageMisc, 70,
-    "STREAMPOOF", "Masque au-dessus de ta tete",
+    "STREAMPOOF", "Tete + kill feed en haut a gauche",
     function(active)
         if active then activerStreamPoof() else desactiverStreamPoof() end
     end)
