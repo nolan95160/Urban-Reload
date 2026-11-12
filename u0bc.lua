@@ -2376,7 +2376,7 @@ addGui("TextLabel", betaTestRow, {
     Position = UDim2.fromOffset(131, 17),
     Size = UDim2.new(1, -147, 0, 35),
     BackgroundTransparency = 1,
-    Text = "Fonctionnalites experimentales\\nA venir",
+    Text = "Fonctionnalites experimentales\nA venir",
     Font = Enum.Font.Code, TextSize = 10,
     TextWrapped = true,
     TextColor3 = T.muted,
