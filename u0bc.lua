@@ -1362,7 +1362,7 @@ local function definirWorldMode(mode)
 end
 
 -- ================= U0BC | INTERFACE V27 =================
--- Menus : AIM, VISUAL, WORLD, SETTING. Art original inspire de la structure verre/neon
+-- Menus : AIM, VISUAL, WORLD, MISC. Art original inspire de la structure verre/neon
 -- de Local S, avec une palette ardoise/violet/cyan et un fond anime.
 local T = {
     bg = Color3.fromRGB(7, 7, 9),
@@ -1549,7 +1549,7 @@ addGui("TextLabel", header, {
 local version = addGui("TextLabel", header, {
     Position = UDim2.new(1, -169, 0, 27), Size = UDim2.fromOffset(61, 23),
     BackgroundColor3 = T.surface2, BackgroundTransparency = 0.04,
-    Font = Enum.Font.Code, TextSize = 10, Text = "V27.0",
+    Font = Enum.Font.Code, TextSize = 10, Text = "V28.0",
     TextColor3 = T.cyan,
 })
 corner(version, 8)
@@ -1626,7 +1626,7 @@ local tabLabels = {
     AIM = {title = "AIM", subtitle = ""},
     VISUAL = {title = "VISUAL", subtitle = ""},
     WORLD = {title = "WORLD", subtitle = "OPTIMISATION DU RENDU"},
-    SETTING = {title = "PREFERENCES", subtitle = ""},
+    MISC = {title = "MISC", subtitle = ""},
 }
 
 local function selectPage(name)
@@ -1712,7 +1712,7 @@ end
 local pageAim = newTab("AIM", "", 0)
 local pageVisual = newTab("VISUAL", "", 1)
 local pageWorld = newTab("WORLD", "", 2)
-local pageSetting = newTab("SETTING", "", 3)
+local pageMisc = newTab("MISC", "", 3)
 
 local function newRow(page, y, height)
     local r = addGui("Frame", page, {
@@ -2034,6 +2034,38 @@ undetectToggle.row.BackgroundTransparency = 0.14
 undetectToggle.row.ClipsDescendants = true
 undetectToggle.row.Visible = false
 
+-- La seconde option du FARM est maintenant BACKGROUND AIM.
+-- Elle suit les memes transitions que Undetect dans OPTIONS.
+local backgroundToggle = newToggle(pageAim, 168,
+    "BACKGROUND AIM", "Camera sans souris / experimental",
+    function(active)
+        backgroundAimEnabled = active
+        if active then activerCameraBackground() else libererCameraBackground() end
+    end)
+backgroundToggle.row.Size = UDim2.new(1, -20, 0, 47)
+backgroundToggle.row.Position = UDim2.fromOffset(20, 168)
+backgroundToggle.row.BackgroundColor3 = T.surface2
+backgroundToggle.row.BackgroundTransparency = 0.14
+backgroundToggle.row.ClipsDescendants = true
+backgroundToggle.row.Visible = false
+
+-- Les deux sous-options font 47px pour tenir dans la page AIM sans scroll.
+local function ajusterLigneFarm(toggle, titre)
+    for _, enfant in ipairs(toggle.row:GetChildren()) do
+        if enfant:IsA("TextLabel") then
+            if enfant.Text == titre then
+                enfant.Position = UDim2.fromOffset(17, 5)
+                enfant.Size = UDim2.new(1, -125, 0, 21)
+            else
+                enfant.Position = UDim2.fromOffset(17, 27)
+                enfant.Size = UDim2.new(1, -105, 0, 17)
+            end
+        end
+    end
+end
+ajusterLigneFarm(undetectToggle, "Undetect")
+ajusterLigneFarm(backgroundToggle, "BACKGROUND AIM")
+
 local danceToggle = newToggle(pageAim, 144,
     "ANTI DANCE", "Stoppe les danses via touche 2",
     function(active) configurerAntiDance(active) end, "F3")
@@ -2074,39 +2106,61 @@ local function afficherOptionsFarm(ouvrir)
     tween(optionsButton, 0.18, {TextColor3 = ouvrir and T.purple or T.cyan})
 
     if ouvrir then
-        undetectToggle.row.Visible = true
-        undetectToggle.row.Position = UDim2.fromOffset(20, 111)
-        undetectToggle.row.Size = UDim2.new(1, -20, 0, 2)
-        undetectToggle.row.BackgroundTransparency = 1
-        tween(undetectToggle.row, 0.26, {
-            Position = UDim2.fromOffset(20, 121),
-            Size = UDim2.new(1, -20, 0, 60),
-            BackgroundTransparency = 0.14,
-        })
+        for _, donnee in ipairs({
+            {toggle = undetectToggle, y = 115},
+            {toggle = backgroundToggle, y = 168},
+        }) do
+            local ligne = donnee.toggle.row
+            ligne.Visible = true
+            ligne.Position = UDim2.fromOffset(20, donnee.y - 5)
+            ligne.Size = UDim2.new(1, -20, 0, 2)
+            ligne.BackgroundTransparency = 1
+            tween(ligne, 0.26, {
+                Position = UDim2.fromOffset(20, donnee.y),
+                Size = UDim2.new(1, -20, 0, 47),
+                BackgroundTransparency = 0.14,
+            })
+        end
     else
-        tween(undetectToggle.row, 0.21, {
-            Position = UDim2.fromOffset(20, 111),
-            Size = UDim2.new(1, -20, 0, 2),
-            BackgroundTransparency = 1,
-        })
+        for _, donnee in ipairs({
+            {toggle = undetectToggle, y = 115},
+            {toggle = backgroundToggle, y = 168},
+        }) do
+            tween(donnee.toggle.row, 0.21, {
+                Position = UDim2.fromOffset(20, donnee.y - 5),
+                Size = UDim2.new(1, -20, 0, 2),
+                BackgroundTransparency = 1,
+            })
+        end
         task.delay(0.23, function()
             if not optionsExpanded and expansionNumero == numero and gui.Parent then
                 undetectToggle.row.Visible = false
+                backgroundToggle.row.Visible = false
             end
         end)
     end
 
+    -- L'ANTI DANCE conserve son bouton, son sous-titre se cache dans le mode compact.
+    for _, enfant in ipairs(danceToggle.row:GetChildren()) do
+        if enfant:IsA("TextLabel") then
+            if enfant.Text == "ANTI DANCE" then
+                enfant.Position = UDim2.fromOffset(17, ouvrir and 4 or 12)
+            elseif enfant.Text == "Stoppe les danses via touche 2" then
+                enfant.Visible = not ouvrir
+            end
+        end
+    end
     tween(farmToggle.row, 0.27, {
         Position = UDim2.fromOffset(0, ouvrir and 50 or 61),
-        Size = UDim2.new(1, 0, 0, ouvrir and 64 or 75),
+        Size = UDim2.new(1, 0, 0, ouvrir and 60 or 75),
     })
     tween(danceToggle.row, 0.27, {
-        Position = UDim2.fromOffset(0, ouvrir and 188 or 144),
-        Size = UDim2.new(1, 0, 0, ouvrir and 63 or 75),
+        Position = UDim2.fromOffset(0, ouvrir and 220 or 144),
+        Size = UDim2.new(1, 0, 0, ouvrir and 35 or 75),
     })
     tween(statusRow, 0.27, {
-        Position = UDim2.fromOffset(0, ouvrir and 257 or 229),
-        Size = UDim2.new(1, 0, 0, ouvrir and 45 or 70),
+        Position = UDim2.fromOffset(0, ouvrir and 260 or 229),
+        Size = UDim2.new(1, 0, 0, ouvrir and 40 or 70),
     })
     tween(statusText, 0.27, {
         Position = UDim2.fromOffset(33, ouvrir and 0 or 7),
@@ -2141,35 +2195,100 @@ afficherEtatFarm = function(_, description)
     end
 end
 
--- Option facultative pour tester la visée caméra sans dépendance à la souris.
--- Le tir via VirtualInputManager peut quand meme etre refuse en arriere-plan.
-local backgroundToggle = newToggle(pageSetting, 162,
-    "BACKGROUND AIM", "Camera sans souris / experimental",
-    function(active)
-        backgroundAimEnabled = active
-        if active then activerCameraBackground() else libererCameraBackground() end
-    end)
+-- ================= STREAMPOOF : MASQUE AU-DESSUS DE LA TETE =================
+-- Un BillboardGui cache visuellement la zone au-dessus de notre propre tete.
+-- Ce n'est PAS un flou reel de la capture : Roblox ne propose pas de
+-- flou gaussien localise par-dessus le rendu 3D en BillboardGui.
+local streamPoofActif = false
+local streamPoofMasque = nil
+local streamPoofConnexions = {}
 
-local settingsRow = newRow(pageSetting, 69, 77)
-addGui("TextLabel", settingsRow, {
-    Position = UDim2.fromOffset(17, 11), Size = UDim2.new(1, -140, 0, 22),
-    Text = "CLOSE SCRIPT", BackgroundTransparency = 1,
-    TextColor3 = T.text, Font = Enum.Font.GothamBlack,
-    TextSize = 13, TextXAlignment = Enum.TextXAlignment.Left,
-})
-addGui("TextLabel", settingsRow, {
-    Position = UDim2.fromOffset(17, 37), Size = UDim2.new(1, -125, 0, 20),
-    Text = "Arrete tous les modules et ferme le menu", BackgroundTransparency = 1,
-    TextColor3 = T.muted, Font = Enum.Font.Code,
-    TextSize = 10, TextXAlignment = Enum.TextXAlignment.Left,
-})
-local closeMain = addGui("TextButton", settingsRow, {
-    Position = UDim2.new(1, -108, 0.5, -17), Size = UDim2.fromOffset(91, 34),
-    BackgroundColor3 = Color3.fromRGB(91, 43, 66), BorderSizePixel = 0,
-    Text = "CLOSE", TextColor3 = T.red, TextSize = 12,
-    Font = Enum.Font.Code, AutoButtonColor = false,
-})
-corner(closeMain, 9)
+local function supprimerMasqueStreamPoof()
+    if streamPoofMasque then
+        pcall(function() streamPoofMasque:Destroy() end)
+        streamPoofMasque = nil
+    end
+end
+
+local function creerMasqueStreamPoof(personnage)
+    if not streamPoofActif or not personnage then return end
+    local tete = personnage:FindFirstChild("Head") or personnage:WaitForChild("Head", 5)
+    if not streamPoofActif or not tete or not tete:IsA("BasePart") then return end
+    supprimerMasqueStreamPoof()
+
+    local masque = Instance.new("BillboardGui")
+    masque.Name = "U0BC_StreamPoof_Mask"
+    masque.Adornee = tete
+    masque.Size = UDim2.fromOffset(240, 66)
+    masque.StudsOffsetWorldSpace = Vector3.new(0, 2.55, 0)
+    masque.AlwaysOnTop = true
+    masque.MaxDistance = 800
+    masque.ResetOnSpawn = false
+    masque.Parent = joueurLocal:WaitForChild("PlayerGui")
+
+    -- Coeur opaque qui masque les noms, avec bordures adoucies.
+    local fond = Instance.new("Frame")
+    fond.Size = UDim2.fromScale(1, 1)
+    fond.BackgroundColor3 = Color3.fromRGB(26, 29, 36)
+    fond.BorderSizePixel = 0
+    fond.Parent = masque
+    local arrondi = Instance.new("UICorner")
+    arrondi.CornerRadius = UDim.new(0, 24)
+    arrondi.Parent = fond
+
+    local degrade = Instance.new("UIGradient")
+    degrade.Rotation = 0
+    degrade.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(72, 76, 88)),
+        ColorSequenceKeypoint.new(0.25, Color3.fromRGB(31, 34, 42)),
+        ColorSequenceKeypoint.new(0.75, Color3.fromRGB(31, 34, 42)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(72, 76, 88)),
+    })
+    degrade.Transparency = NumberSequence.new({
+        NumberSequenceKeypoint.new(0, 0.74),
+        NumberSequenceKeypoint.new(0.10, 0.04),
+        NumberSequenceKeypoint.new(0.90, 0.04),
+        NumberSequenceKeypoint.new(1, 0.74),
+    })
+    degrade.Parent = fond
+
+    local bordure = Instance.new("UIStroke")
+    bordure.Color = Color3.fromRGB(113, 120, 135)
+    bordure.Thickness = 1.5
+    bordure.Transparency = 0.55
+    bordure.Parent = fond
+
+    streamPoofMasque = masque
+end
+
+local function desactiverStreamPoof()
+    streamPoofActif = false
+    for _, connexion in ipairs(streamPoofConnexions) do
+        connexion:Disconnect()
+    end
+    streamPoofConnexions = {}
+    supprimerMasqueStreamPoof()
+end
+
+local function activerStreamPoof()
+    if streamPoofActif then return end
+    streamPoofActif = true
+    local ancienMasque = joueurLocal:WaitForChild("PlayerGui"):FindFirstChild("U0BC_StreamPoof_Mask")
+    if ancienMasque then ancienMasque:Destroy() end
+    table.insert(streamPoofConnexions, joueurLocal.CharacterAdded:Connect(function(personnage)
+        task.defer(creerMasqueStreamPoof, personnage)
+    end))
+    table.insert(streamPoofConnexions, joueurLocal.CharacterRemoving:Connect(supprimerMasqueStreamPoof))
+    if joueurLocal.Character then
+        task.defer(creerMasqueStreamPoof, joueurLocal.Character)
+    end
+end
+
+local streamPoofToggle = newToggle(pageMisc, 70,
+    "STREAMPOOF", "Masque au-dessus de ta tete",
+    function(active)
+        if active then activerStreamPoof() else desactiverStreamPoof() end
+    end)
 
 local binds = {farm = Enum.KeyCode.F4, dance = Enum.KeyCode.F3}
 local capture = nil
@@ -2524,6 +2643,7 @@ local function closeAll()
     restaurerWorld()
     farmToggle.set(false)
     backgroundToggle.set(false)
+    streamPoofToggle.set(false)
     undetectToggle.set(false)
     danceToggle.set(false)
     espZombie.set(false)
@@ -2546,9 +2666,9 @@ local function closeAll()
     gui:Destroy()
 end
 closeBtn.MouseButton1Click:Connect(closeAll)
-closeMain.MouseButton1Click:Connect(closeAll)
 -- Restaurer meme si le menu est detruit par une nouvelle execution.
 gui.Destroying:Connect(restaurerWorld)
+gui.Destroying:Connect(desactiverStreamPoof)
 
 -- Les callbacks du menu ne sont pas sauvegardes dans l'ancien script V9.
 -- Desactivez l'ancienne execution avant d'executer cette version.
