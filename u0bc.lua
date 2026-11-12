@@ -1549,7 +1549,7 @@ addGui("TextLabel", header, {
 local version = addGui("TextLabel", header, {
     Position = UDim2.new(1, -169, 0, 27), Size = UDim2.fromOffset(61, 23),
     BackgroundColor3 = T.surface2, BackgroundTransparency = 0.04,
-    Font = Enum.Font.Code, TextSize = 10, Text = "V29.0",
+    Font = Enum.Font.Code, TextSize = 10, Text = "V30.0",
     TextColor3 = T.cyan,
 })
 corner(version, 8)
@@ -2354,6 +2354,35 @@ local streamPoofToggle = newToggle(pageMisc, 70,
     function(active)
         if active then activerStreamPoof() else desactiverStreamPoof() end
     end)
+
+-- En-tete de la zone des futures fonctions experimentales.
+-- Ce n'est pas un toggle : aucune fonctionnalite supplementaire activee.
+local betaTestRow = newRow(pageMisc, 158, 76)
+local betaTestBadge = addGui("Frame", betaTestRow, {
+    Position = UDim2.fromOffset(17, 16),
+    Size = UDim2.fromOffset(103, 29),
+    BackgroundColor3 = T.surface2, BorderSizePixel = 0,
+})
+corner(betaTestBadge, 8)
+stroke(betaTestBadge, T.red, 1.2, 0.3)
+addGui("TextLabel", betaTestBadge, {
+    Size = UDim2.fromScale(1, 1),
+    BackgroundTransparency = 1,
+    Text = "BETA / TEST",
+    Font = Enum.Font.GothamBlack, TextSize = 12,
+    TextColor3 = T.red,
+})
+addGui("TextLabel", betaTestRow, {
+    Position = UDim2.fromOffset(131, 17),
+    Size = UDim2.new(1, -147, 0, 35),
+    BackgroundTransparency = 1,
+    Text = "Fonctionnalites experimentales\\nA venir",
+    Font = Enum.Font.Code, TextSize = 10,
+    TextWrapped = true,
+    TextColor3 = T.muted,
+    TextXAlignment = Enum.TextXAlignment.Left,
+    TextYAlignment = Enum.TextYAlignment.Center,
+})
 
 local binds = {farm = Enum.KeyCode.F4, dance = Enum.KeyCode.F3}
 local capture = nil
