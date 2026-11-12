@@ -164,7 +164,7 @@ do
     divider.BorderSizePixel = 0
     divider.Parent = frame
     local version = Instance.new("TextLabel")
-    version.Position = UDim2.new(1, -74, 0, 30)
+    version.Position = UDim2.new(1, -108, 0, 30)
     version.Size = UDim2.fromOffset(52, 24)
     version.BackgroundColor3 = Color3.fromRGB(39, 14, 22)
     version.Font = Enum.Font.GothamBold
@@ -178,6 +178,42 @@ do
     scale.Parent = frame
     TweenService:Create(scale, TweenInfo.new(0.34,
         Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1}):Play()
+end
+
+-- Fermer l'activation sans lancer le script (meme pendant une requete reseau).
+local closeAuthButton = Instance.new("TextButton")
+closeAuthButton.Name = "FermerUrbanReload"
+closeAuthButton.Position = UDim2.new(1, -42, 0, 27)
+closeAuthButton.Size = UDim2.fromOffset(27, 27)
+closeAuthButton.BackgroundColor3 = Color3.fromRGB(58, 17, 29)
+closeAuthButton.BorderSizePixel = 0
+closeAuthButton.Text = "X"
+closeAuthButton.Font = Enum.Font.GothamBold
+closeAuthButton.TextSize = 14
+closeAuthButton.TextColor3 = Color3.fromRGB(255, 151, 165)
+closeAuthButton.AutoButtonColor = false
+closeAuthButton.ZIndex = 5
+closeAuthButton.Parent = frame
+rounded(closeAuthButton, 8)
+
+do
+    local border = Instance.new("UIStroke")
+    border.Color = Color3.fromRGB(128, 31, 50)
+    border.Transparency = 0.25
+    border.Parent = closeAuthButton
+    local ts = game:GetService("TweenService")
+    closeAuthButton.MouseEnter:Connect(function()
+        ts:Create(closeAuthButton, TweenInfo.new(0.15), {
+            BackgroundColor3 = Color3.fromRGB(102, 25, 44),
+            TextColor3 = Color3.fromRGB(255, 255, 255),
+        }):Play()
+    end)
+    closeAuthButton.MouseLeave:Connect(function()
+        ts:Create(closeAuthButton, TweenInfo.new(0.15), {
+            BackgroundColor3 = Color3.fromRGB(58, 17, 29),
+            TextColor3 = Color3.fromRGB(255, 151, 165),
+        }):Play()
+    end)
 end
 
 local title = Instance.new("TextLabel")
@@ -277,6 +313,16 @@ status.Text = "1 cle, 1 appareil  |  Acces sans expiration"
 status.Parent = frame
 
 local busy = false
+local closed = false
+
+local function closeAuth()
+    if closed then return end
+    closed = true
+    keyBox.Text = ""
+    gui:Destroy()
+end
+closeAuthButton.MouseButton1Click:Connect(closeAuth)
+
 local function setStatus(message, good)
     status.Text = message
     status.TextColor3 = good and Color3.fromRGB(117, 225, 162)
@@ -284,7 +330,7 @@ local function setStatus(message, good)
 end
 
 local function activate()
-    if busy then return end
+    if busy or closed or not gui.Parent then return end
     local key = keyBox.Text:match("^%s*(.-)%s*$")
     if not key or #key < 12 then
         setStatus("Cle trop courte ou vide.", false)
@@ -319,6 +365,9 @@ local function activate()
         })
     end)
 
+    -- La fenetre peut avoir ete fermee pendant que request() attendait.
+    if closed or not gui.Parent then return end
+
     if not ok or type(response) ~= "table" then
         setStatus("Connexion HTTPS impossible ou bloquee par Real.", false)
     else
@@ -327,6 +376,7 @@ local function activate()
         end)
         if decodedOK and type(data) == "table"
             and response.StatusCode == 200 and data.ok == true and data.allowed == true then
+            if closed or not gui.Parent then return end
             setStatus("Cle valide ! Lancement de la V1...", true)
             local loaded, err = pcall(launchOriginalV33)
             if loaded then
