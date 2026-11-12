@@ -141,7 +141,7 @@ subtitle.Font = Enum.Font.Gotham
 subtitle.TextSize = 12
 subtitle.TextColor3 = Color3.fromRGB(175, 176, 187)
 subtitle.TextXAlignment = Enum.TextXAlignment.Left
-subtitle.Text = "Entre ta cle personnelle pour lancer la V38"
+subtitle.Text = "Entre ta cle personnelle pour lancer la V40"
 subtitle.Parent = frame
 
 local keyBox = Instance.new("TextBox")
@@ -234,14 +234,14 @@ local function activate()
         end)
         if decodedOK and type(data) == "table"
             and response.StatusCode == 200 and data.ok == true and data.allowed == true then
-            setStatus("Cle valide ! Lancement de la V38...", true)
+            setStatus("Cle valide ! Lancement de la V40...", true)
             local loaded, err = pcall(launchOriginalV33)
             if loaded then
                 gui:Destroy()
                 return
             end
-            warn("[URBAN RELOAD] Erreur de lancement V38:", tostring(err))
-            setStatus("Erreur V38 : " .. tostring(err):sub(1, 160), false)
+            warn("[URBAN RELOAD] Erreur de lancement V40:", tostring(err))
+            setStatus("Erreur V40 : " .. tostring(err):sub(1, 160), false)
         elseif response.StatusCode == 401 then
             setStatus("Cle invalide ou desactivee.", false)
         elseif response.StatusCode == 403 then
