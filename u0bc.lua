@@ -154,7 +154,7 @@ keyBox.Font = Enum.Font.Code
 keyBox.TextSize = 13
 keyBox.TextColor3 = Color3.fromRGB(245, 245, 245)
 keyBox.PlaceholderColor3 = Color3.fromRGB(126, 128, 141)
-keyBox.PlaceholderText = "Colle ta cle ici (ex. pseudo-...)"
+keyBox.PlaceholderText = "Entre ta cle courte (UR-...)"
 keyBox.Text = ""
 keyBox.ClearTextOnFocus = false
 keyBox.Parent = frame
@@ -193,7 +193,7 @@ end
 local function activate()
     if busy then return end
     local key = keyBox.Text:match("^%s*(.-)%s*$")
-    if not key or #key < 20 then
+    if not key or #key < 12 then
         setStatus("Cle trop courte ou vide.", false)
         return
     end
