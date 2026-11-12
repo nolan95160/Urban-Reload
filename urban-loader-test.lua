@@ -4,7 +4,7 @@ local Players = game:GetService("Players")
 local HttpService = game:GetService("HttpService")
 
 local API_URL = "https://51.255.205.163:3005/activate"
-local SCRIPT_URL = "https://raw.githubusercontent.com/nolan95160/Urban-Reload/main/u0bc.lua?v=33-loader-test"
+local SCRIPT_URL = "https://raw.githubusercontent.com/nolan95160/Urban-Reload/main/urban-v33-payload.lua?v=33"
 
 local player = Players.LocalPlayer
 if not player then
